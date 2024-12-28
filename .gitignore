@@ -2,3 +2,4 @@
 .settings/
 build_devlib-dev.sh
 build_devlib-hoefnix
+/build_devlib-hoefnix.sh
