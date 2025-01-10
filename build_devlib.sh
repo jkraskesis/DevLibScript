@@ -134,7 +134,7 @@ APPLICATION_NAME=robotworld
 # Configure this depending on the versions/URLs of the packages
 ###############################################################
 
-BOOST_URL=https://boostorg.jfrog.io/artifactory/main/release/1.86.0/source/boost_1_86_0.tar.bz2
+BOOST_URL=https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2
 WXWIDGETS_URL=https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.6/wxWidgets-3.2.6.tar.bz2
 APPLICATION_URL=ssh://git@bitbucket.aimsites.nl:7999/esdd/${APPLICATION_NAME}.git
 
