@@ -102,8 +102,8 @@ while true; do
 		-h|--help)
 			echo "The arguments to use are: "
 			echo "	-o | --os darwin|linux|mingw"
-			echo "	-b | --buildtools configure|cmake|all"
-			echo "	-c | --compiler gcc|clang|all"
+			echo "	-b | --buildtools configure|cmake|both"
+			echo "	-c | --compiler gcc|clang|both"
 			echo "	boost"
 			echo "	wxwidgets"
 			echo "	application"
@@ -561,8 +561,6 @@ function configure_application
 		CXX="/usr/bin/clang++"
 	fi 
 
-#CMAKE_PREFIX_PATH=/home/jkr/devlib/linux/boost/clang/boost.tagged/lib/cmake:/home/jkr/devlib/linux/wxwidgets/cmake/clang/wxWidgets-3.2.6/lib/cmake
-#CMAKE_PREFIX_PATH=/home/jkr/devlib/${OS}/boost/${COMPILER}/boost.tagged/lib/cmake:/home/jkr/devlib/${OS}/wxwidgets/cmake/${COMPILER}/${WXWIDGETS_DIR}/lib/cmake
 	if [ ${BUILDTOOL} = "configure" ] 
 	then
 		APPLICATION_CONFIGURE="CXX=${CXX} ../../../configure --with-wx-config=${INSTALL_DIR}/${OS}/wxwidgets/${BUILDTOOL}/${COMPILER}/${WXWIDGETS_DIR}/bin/wx-config --with-boost=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged --with-cxx=17 2>&1 | tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log"		
