@@ -70,10 +70,10 @@ LOG_DIR=${HOME}/devlib/logs
 # Source the helper scripts
 ########################################################
 
-source boost.sh
-source wxwidgets.sh
-source messaginglibrary.sh
-source robotworld.sh
+source modules/boost.sh
+source modules/wxwidgets.sh
+source modules/messaginglibrary.sh
+source modules/robotworld.sh
 
 ########################################################
 # Handle the arguments
