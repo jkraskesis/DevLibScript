@@ -60,11 +60,20 @@ HOME=~
 
 SRC_DIR=${HOME}/devlib/src
 INSTALL_DIR=${HOME}/devlib/
-LOG_DIR=${HOME}/devlib/src/logs
+LOG_DIR=${HOME}/devlib/logs
 
 #######################################################################################################################################
 # Hopefully no configuration needed below these lines
 #######################################################################################################################################
+
+########################################################
+# Source the helper scripts
+########################################################
+
+source boost.sh
+source wxwidgets.sh
+source messaginglibrary.sh
+source robotworld.sh
 
 ########################################################
 # Handle the arguments
@@ -194,7 +203,6 @@ function set_ccache
 	local CCACHE_PATH=${1}
 
 	export PATH=${CCACHE_PATH}:$PATH
-	#export PATH=/usr/lib/ccache:$PATH
 	# log for debug purposes
 	#export CCACHE_LOGFILE=/home/jkr/build/ccache.log
 	# more info, more! 
@@ -289,554 +297,19 @@ function create_directories
 	mkdir -p ${LOG_DIR}
 }
 
-###################################################################
-# Remove the source of Boost
-# This also removes all compilation artifacts, NOT the installation
-################################################################### 
-function remove_boost_source
-{
-	# source file
-	if [ -f "${SRC_DIR}/${BOOST_SRC_FILE}" ]; then
-  		rm ${SRC_DIR}/${BOOST_SRC_FILE:?}
-	fi
-	# source and build directory
-	if [ -d "${SRC_DIR}/${BOOST_DIR}" ]; then
-  		rm -rf ${SRC_DIR}/${BOOST_DIR:?}
-	fi
-}
-
-###################################################################
-# Remove all installations of Boost
-################################################################### 
-function remove_boost_installations
-{
-	# installation directory
-	if [ -d "${INSTALL_DIR}/${OS}/boost" ]; then
-  		rm -rf ${INSTALL_DIR}/${OS}/boost
-	fi
-}
-
-###################################################################
-# Remove the downloaded source of wxWidgets
-# This also removes all compilation artifacts, NOT the installation
-###################################################################
-function remove_wxwidgets_source
-{
-	# source file
-	if [ -f "${SRC_DIR}/${WXWIDGETS_SRC_FILE}" ]; then
-  		rm "${SRC_DIR}/${WXWIDGETS_SRC_FILE:?}"
-	fi
-	# source and build directory
-	if [ -d "${SRC_DIR}/${WXWIDGETS_DIR}" ]; then
-  		rm -rf ${SRC_DIR}/${WXWIDGETS_DIR:?}
-	fi
-}
-
-#######################################
-# Remove all installations of wxWidgets
-#######################################
-function remove_wxwidgets_installations
-{
-	if [ -d "${INSTALL_DIR}/${OS}/wxwidgets" ]; then
-			rm -rf ${INSTALL_DIR}/${OS}/wxwidgets
-	fi
-}
-
-###################################################################
-# Remove the source of the messaging library
-# This also removes all compilation artifacts, NOT the installation
-###################################################################
-function remove_messaging_source
-{
-	# source directory
-	if [ -d "${SRC_DIR}/${MESSAGING_DIR}" ]; then
-  		rm -rf "${SRC_DIR}/${MESSAGING_DIR:?}"
-	fi
-}
-
-###################################################################
-# Remove all installations of the messaging library
-###################################################################
-function remove_messaging_installations
-{
-	# source directory
-	if [ -d "${INSTALL_DIR}/${MESSAGING_DIR}" ]; then
-  		rm -rf "${INSTALL_DIR}/${MESSAGING_DIR:?}"
-	fi
-}
-
-###################################################################
-# Remove the source of the application
-# This also removes all compilation artifacts, NOT the installation
-###################################################################
-function remove_application_source
-{
-	# source directory
-	if [ -d "${SRC_DIR}/${APPLICATION_DIR}" ]; then
-  		rm -rf "${SRC_DIR}/${APPLICATION_DIR:?}"
-	fi
-}
-
-###################################################################
-# Remove the sources
-# This also removes all compilation artifacts, NOT the installation
-###################################################################
-function remove_sources
-{
-	remove_boost_source
-	remove_wxwidgets_source
-	remove_messaging_source
-	remove_application_source
-}
-
-############################
-# Remove the installed files
-############################
-function remove_installations
-{
-	remove_boost_installations
-	remove_wxwidgets_installations
-	remove_messaging_installations
-}
-
-######################
-# Remove the log files
-######################
-function remove_logs
-{
-	if [ -d "${SRC_DIR}/logs" ]; then
-		rm -rf "${SRC_DIR}/logs"
-	fi
-}
-
-###############
-# Remove devlib
-###############
-function remove_devlib
-{
-	if [ -d "${HOME}/scripttest" ]; then
-		rm -rf "${HOME}/scripttest"
-	fi
-}
-
-############################
-# Download and extract Boost
-############################
-function download_and_extract_boost
-{
-	cd ${SRC_DIR} || exit
-	# Only download the local file does not exist, or if the remote file is newer
-	wget -N ${BOOST_URL}
-	# Do not overwrite any existing files
-	tar --skip-old-files -xjf ${BOOST_SRC_FILE}
-}
-
-################################
-# Download and extract wxWidgets
-################################
-function download_and_extract_wxwidgets
-{
-	cd ${SRC_DIR} || exit
-	# Only download the local file does not exist, or if the remote file is newer
-	wget -N ${WXWIDGETS_URL}
-	# Do not overwrite any existing files
-	tar --skip-old-files -xjf ${WXWIDGETS_SRC_FILE}
-}
-
-#############################
-# Clone the messaging library
-#############################
-function clone_messaging
-{
-	cd ${SRC_DIR} || exit
-	git clone $MESSAGING_URL
-}
-
-#######################
-# Clone the application
-#######################
-function clone_application
-{
-	cd ${SRC_DIR} || exit
-	git clone $APPLICATION_URL
-}
-
-#######################
-# Get all sources
-#######################
-function get_sources
-{
-	download_and_extract_boost
-	download_and_extract_wxwidgets
-	clone_messaging
-	clone_application
-}
-
-#########################################
-# Boost configuration (compilation of b2)
-#########################################
-function configure_boost
-{
-	local COMPILER=${1}
-	
-	# Separate Linux and Darwin in anticipation for differences...
-	case ${OS} in
-	darwin*)
-		########################################## Darwin ##########################################
-		########################################## Darwin ##########################################	
-		;&
-	linux*)
-		########################################## Linux ##########################################
-		BOOST_DIRECTORY_SEPARATOR="/"
-		BOOST_BOOTSTRAP_COMMAND=bootstrap.sh
-		BOOST_BOOTSTRAP=".${BOOST_DIRECTORY_SEPARATOR}$BOOST_BOOTSTRAP_COMMAND ${COMPILER} 2>&1 | tee -a ${LOG_DIR}/boost_b2_build.log"
-		########################################## Linux ##########################################
-		;;
-	mingw*)
-		########################################## W64 ##########################################
-		# See introduction of the configuration.
-		# Replace the '/' in the Unix path with '\' in the Windows path
-		BOOST_DIRECTORY_SEPARATOR="/"
-		BOOST_BOOTSTRAP_COMMAND=bootstrap.sh
-		BOOST_BOOTSTRAP=".${BOOST_DIRECTORY_SEPARATOR}$BOOST_BOOTSTRAP_COMMAND ${COMPILER} 2>&1 | tee -a ${LOG_DIR}/boost_b2_build.log"
-		########################################## W64 ##########################################
-		;;		
-	esac
-
-	#########################
-	# Get, build and install it
-	#########################
-	cd ${SRC_DIR}/${BOOST_DIR}  || exit
-	rm -f ${LOG_DIR}/boost_b2_build.log
-	echo "Current directory: "$(pwd) | tee ${LOG_DIR}/boost_b2_build.log
-	echo "${BOOST_BOOTSTRAP}" | tee -a ${LOG_DIR}/boost_b2_build.log
-	eval ${BOOST_BOOTSTRAP}
-}
-
-###################
-# Boost compilation
-###################
-function compile_boost
-{
-	local COMPILER=${1}
-	
-	case ${OS} in
-	darwin*)
-		########################################## Darwin ##########################################
-		########################################## Darwin ##########################################
-		;;
-	linux*)
-		########################################## Linux ##########################################
-		BOOST_DIRECTORY_SEPARATOR="/"
-		BOOST_B2=$(cat <<-EOF
-						.${BOOST_DIRECTORY_SEPARATOR}b2 
-						-j$NUMBER_OF_COMPILATIONS 
-						toolset=${COMPILER} 
-						--build-dir=${SRC_DIR}/${BOOST_DIR}/build/${OS}/${COMPILER} 
-						--stagedir=${SRC_DIR}/${BOOST_DIR}/stage/${OS}/${COMPILER} 
-						--prefix=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged 
-						--build-type=complete link=shared runtime-link=shared threading=multi,single variant=debug,release --layout=tagged --without-python --without-mpi 
-						--cxxflags="-std=c++17" 
-						install stage 
-						2>&1 
-						| tee -a ${LOG_DIR}/boost_${OS}_b2_${COMPILER}_build.log 
-						EOF
-						)
-		########################################## Linux ##########################################
-		;;
-	mingw*)
-		########################################## W64 ##########################################
-		BOOST_DIRECTORY_SEPARATOR="/"
-		BOOST_B2=$(cat <<-EOF
-						.${BOOST_DIRECTORY_SEPARATOR}b2 
-						-j$NUMBER_OF_COMPILATIONS 
-						toolset=${COMPILER} 
-						--build-dir=${SRC_DIR}/${BOOST_DIR}/build/${OS}/${COMPILER} 
-						--stagedir=${SRC_DIR}/${BOOST_DIR}/stage/${OS}/${COMPILER} 
-						--prefix=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged 
-						--build-type=complete link=shared runtime-link=shared threading=multi,single variant=debug,release --layout=tagged --without-python --without-mpi 
-						--cxxflags="-std=c++17" 
-						install stage 
-						2>&1 
-						| tee -a ${LOG_DIR}/boost_${OS}_b2_${COMPILER}_build.log 
-						EOF
-						)
-		########################################## W64 ##########################################
-		;;
-	esac
-
-	#########################
-	# build and install it
-	#########################
-	cd "${SRC_DIR}/${BOOST_DIR}"  || exit
-	rm -f ${LOG_DIR}/boost_${OS}_b2_${COMPILER}_build.log
-	echo "Current directory: "$(pwd) | tee ${LOG_DIR}/boost_${OS}_b2_${COMPILER}_build.log
-	echo "${BOOST_B2}" 2>&1 | tee -a ${LOG_DIR}/boost_${OS}_b2_${COMPILER}_build.log
-	eval ${BOOST_B2}
-}
-
-#########################
-# wxWidgets configuration
-#########################
-function configure_wxwidgets
-{
-	local BUILDTOOL=$1
-	local COMPILER=$2
-	local OS=${OS}
-	
-	if [ "${COMPILER}" = "gcc" ]
-	then
-		CXX="/usr/bin/g++"
-	fi 
-	if [ "${COMPILER}" = "clang" ]
-	then
-		CXX="/usr/bin/clang++"
-	fi
-
-	if [ ${BUILDTOOL} = "configure" ]
-	then
-#	CXX=${CXX} seems to mess up the compilation?
-		WXWIDGETS_CONFIGURE=$(cat <<-EOF
-									../../../configure 
-									--enable-debug 
-									--with-cxx=17 
-									--prefix=${INSTALL_DIR}/${OS}/wxwidgets/${BUILDTOOL}/${COMPILER}/${WXWIDGETS_DIR} 
-									2>&1 
-									| tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
-									EOF
-									)
-	fi 
-	
-	if [ ${BUILDTOOL} = "cmake" ]
-	then
-		WXWIDGETS_CONFIGURE=$(cat <<-EOF
-									CXX=${CXX} 
-									cmake 
-									../../.. 
-									-G "Unix Makefiles" 
-									-DCMAKE_CXX_STANDARD=17 
-									-DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/${OS}/wxwidgets/${BUILDTOOL}/${COMPILER}/${WXWIDGETS_DIR} 
-									2>&1 
-									| tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
-									EOF
-									)
-	fi
-	
-	mkdir -p "${SRC_DIR}/${WXWIDGETS_DIR}/${OS}/${BUILDTOOL}/${COMPILER}"
-	cd "${SRC_DIR}/${WXWIDGETS_DIR}/${OS}/${BUILDTOOL}/${COMPILER}" || exit
-	rm -f ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_config.log
-	echo "Current directory: " $(pwd) | tee ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_config.log
-	echo "${WXWIDGETS_CONFIGURE}" | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_config.log
-	eval ${WXWIDGETS_CONFIGURE}
-}
-
-#######################
-# wxWidgets compilation
-#######################
-function compile_wxwidgets
-{
-	local BUILDTOOL=$1
-	local COMPILER=$2
-	local OS=${OS}
-	
-	WXWIDGETS_MAKE="make -j${NUMBER_OF_COMPILATIONS} 2>&1 | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_build.log"
-	WXWIDGETS_MAKE_INSTALL="make install 2>&1 | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_build.log"
-	
-	cd "${SRC_DIR}/${WXWIDGETS_DIR}/${OS}/${BUILDTOOL}/${COMPILER}" || exit
-	rm -f ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_build.log
-	echo "Current directory: " $(pwd) | tee ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_build.log
-	echo "${WXWIDGETS_MAKE}" | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_build.log
-	eval ${WXWIDGETS_MAKE}
-	echo "${WXWIDGETS_MAKE_INSTALL}" | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_build.log
-	eval ${WXWIDGETS_MAKE_INSTALL}
-}
-
-#########################
-# Messaging configuration
-#########################
-function configure_messaging
-{
-	local BUILDTOOL=$1
-	local COMPILER=$2
-	local OS=${OS}
-	
-	if [ "${COMPILER}" = "gcc" ]
-	then
-		CXX="/usr/bin/g++"
-	fi 
-	if [ "${COMPILER}" = "clang" ]
-	then
-		CXX="/usr/bin/clang++"
-	fi
-
-	if [ ${BUILDTOOL} = "configure" ]
-	then
-#	CXX=${CXX} seems to mess up the compilation?
-		MESSAGING_CONFIGURE=$(cat <<-EOF
-									../../../configure  
-									--with-boost=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged 
-									--prefix=${INSTALL_DIR}/${OS}/${MESSAGING_NAME}/${BUILDTOOL}/${COMPILER}/${MESSAGING_NAME} 
-									--with-cxx=17 
-									${DEBUG_ARGS} 
-									2>&1 
-									| tee -a ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
-									EOF
-									)
-		echo ${MESSAGING_CONFIGURE}
-	fi
-	if [ ${BUILDTOOL} = "cmake" ]
-	then
-		MESSAGING_CONFIGURE=$(cat <<-EOF
-									CMAKE_PREFIX_PATH=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged/lib/cmake 
-									CXX=${CXX} 
-									cmake 
-									../../.. 
-									-G "Unix Makefiles" 
-									-DCMAKE_CXX_STANDARD=17 
-									${DEBUG_ARGS} 
-									-DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/${OS}/${MESSAGING_NAME}/${BUILDTOOL}/${COMPILER}/${MESSAGING_NAME} 
-									2>&1 
-									| tee -a ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
-									EOF
-									)
-	fi
-
-	# update the Autotools files for local things
-	if [ "${BUILDTOOL}" = "configure" ]
-	then
-		cd ${SRC_DIR}/${MESSAGING_DIR} || exit
-		./autogen.sh
-	fi 
-
-	mkdir -p "${SRC_DIR}/${MESSAGING_DIR}/${OS}/${BUILDTOOL}/${COMPILER}"
-	cd "${SRC_DIR}/${MESSAGING_DIR}/${OS}/${BUILDTOOL}/${COMPILER}"  || exit
-
-	rm -f ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log
-	echo "Current directory: " $(pwd) | tee ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log
-	echo "${MESSAGING_CONFIGURE}" | tee -a ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log	
-	eval ${MESSAGING_CONFIGURE}
-}
-
-#######################
-# Messaging compilation
-#######################
-function compile_messaging
-{
-	local BUILDTOOL=$1
-	local COMPILER=$2
-	local OS=${OS}
-
-	MESSAGING_MAKE="make -j${NUMBER_OF_COMPILATIONS} 2>&1 | tee -a ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log"
-	MESSAGING_MAKE_INSTALL="make install 2>&1 | tee -a ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log"
-
-	cd "${SRC_DIR}/${MESSAGING_DIR}/${OS}/${BUILDTOOL}/${COMPILER}" || exit
-	rm -f ${LOG_DIR}/${MESSAGING}_${OS}_${BUILD_TOOL_DIR}_${COMPILER}_build.log	
-	echo "Current directory: " $(pwd) | tee ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log
-	echo "${MESSAGING_MAKE}" | tee -a ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log	
-	eval ${MESSAGING_MAKE}	
-	echo "${MESSAGING_MAKE_INSTALL}" | tee -a ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log
-	eval ${MESSAGING_MAKE_INSTALL}
-}
-
-###########################
-# Application configuration
-###########################
-function configure_application
-{
-	local BUILDTOOL=$1
-	local COMPILER=$2
-	local OS=${OS}
-	
-	if [ "${COMPILER}" = "gcc" ]
-	then
-		CXX="/usr/bin/g++"
-	fi 
-	if [ "${COMPILER}" = "clang" ]
-	then
-		CXX="/usr/bin/clang++"
-	fi 
-
-	if [ ${BUILDTOOL} = "configure" ]
-	then
-#	CXX=${CXX} seems to mess up the compilation?
-		APPLICATION_CONFIGURE=$(cat <<-EOF
-									../../../configure 
-									--with-boost=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged
-									--with-wx-config=${INSTALL_DIR}/${OS}/wxwidgets/${BUILDTOOL}/${COMPILER}/${WXWIDGETS_DIR}/bin/wx-config 
-									--with-messaging=${INSTALL_DIR}/${OS}/${MESSAGING_NAME}/${BUILDTOOL}/${COMPILER}/${MESSAGING_NAME}
-									--with-cxx=17
-									${DEBUG_ARGS} 
-									2>&1 
-									| tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
-									EOF
-									)
-	fi
-	if [ ${BUILDTOOL} = "cmake" ]
-	then
-		APPLICATION_CONFIGURE=$(cat <<-EOF
-									CMAKE_PREFIX_PATH=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged/lib/cmake:${INSTALL_DIR}/${OS}/wxwidgets/cmake/${COMPILER}/${WXWIDGETS_DIR}/lib/cmake 
-									CXX=${CXX} 
-									cmake 
-									../../.. 
-									-G "Unix Makefiles"
-									-DMESSAGEROOT=${INSTALL_DIR}/${OS}/${MESSAGING_NAME}/${BUILDTOOL}/${COMPILER}/${MESSAGING_NAME} 
-									-DCMAKE_CXX_STANDARD=17 
-									${DEBUG_ARGS} 
-									-DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/${OS}/${APPLICATION_NAME}/${BUILDTOOL}/${COMPILER}/${APPLICATION_NAME} 
-									2>&1 
-									| tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
-									EOF
-									)
-	fi
-
-	# update the Autotools files for local things
-	if [ "${BUILDTOOL}" = "configure" ]
-	then
-		cd ${SRC_DIR}/${APPLICATION_DIR} || exit
-		./autogen.sh
-	fi 
-
-	mkdir -p "${SRC_DIR}/${APPLICATION_DIR}/${OS}/${BUILDTOOL}/${COMPILER}"
-	cd "${SRC_DIR}/${APPLICATION_DIR}/${OS}/${BUILDTOOL}/${COMPILER}" || exit
-	rm -f ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log
-	echo "Current directory: " $(pwd) | tee ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log
-	echo "${APPLICATION_CONFIGURE}" | tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log
-	eval ${APPLICATION_CONFIGURE}
-}
-
-#########################
-# Application compilation
-#########################
-function compile_application
-{
-	local BUILDTOOL=$1
-	local COMPILER=$2
-	local OS=${OS}
-
-	APPLICATION_MAKE="make -j${NUMBER_OF_COMPILATIONS} 2>&1 | tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log"
-	
-	cd "${SRC_DIR}/${APPLICATION_DIR}/${OS}/${BUILDTOOL}/${COMPILER}" || exit
-	rm -f ${LOG_DIR}/${APPLICATION}_${OS}_${BUILD_TOOL_DIR}_${COMPILER}_build.log
-	echo "Current directory: " $(pwd) | tee ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log
-	echo "${APPLICATION_MAKE}" | tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log
-	eval ${APPLICATION_MAKE}
-}
-
 ################
 # Do the work...
 ################
-
-# cleanup first
-remove_sources
-remove_installations
-remove_logs
-remove_devlib
 
 # create the directory structure
 create_directories
 
 if [ "$do_boost" = "true" ]
 	then
+
+	remove_boost_source
+	
+	remove_boost_installations
 
 	download_and_extract_boost
 
@@ -855,7 +328,10 @@ fi
 
 if [ "$do_wxwidgets" = "true" ]
 then
-
+	remove_wxwidgets_source
+	
+	remove_wxwidgets_installations
+	
 	download_and_extract_wxwidgets
 
 	if [ "${BUILDTOOL}" = "configure" ] || [ "${BUILDTOOL}" = "both" ]
@@ -889,7 +365,10 @@ fi
 
 if [ "$do_messaging" = "true" ]
 then
+	remove_messaging_source
 
+	remove_messaging_installations
+	
 	clone_messaging 
 
 	if [ "${BUILDTOOL}" = "configure" ] || [ "${BUILDTOOL}" = "both" ]
@@ -935,7 +414,10 @@ fi
 
 if [ "$do_application" = "true" ]
 then
+	remove_application_source
 
+	remove_messaging_installations
+	
 	clone_application 
 
 	if [ "${BUILDTOOL}" = "configure" ] || [ "${BUILDTOOL}" = "both" ]
