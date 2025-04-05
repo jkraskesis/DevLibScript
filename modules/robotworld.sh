@@ -43,23 +43,24 @@ function configure_application
 	
 	if [ "${COMPILER}" = "gcc" ]
 	then
-		CXX="/usr/bin/g++"
+		COMPILATION_CXX="/usr/bin/g++"
 	fi 
 	if [ "${COMPILER}" = "clang" ]
 	then
-		CXX="/usr/bin/clang++"
+		COMPILATION_CXX="/usr/bin/clang++"
 	fi 
 
 	if [ ${BUILDTOOL} = "configure" ]
 	then
 #	CXX=${CXX} seems to mess up the compilation?
 		APPLICATION_CONFIGURE=$(cat <<-EOF
+									CXX=${COMPILATION_CXX} 
 									../../../configure 
-									--with-boost=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged
+									--with-boost=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged 
 									--with-wx-config=${INSTALL_DIR}/${OS}/wxwidgets/${BUILDTOOL}/${COMPILER}/${WXWIDGETS_DIR}/bin/wx-config 
-									--with-messaging=${INSTALL_DIR}/${OS}/${MESSAGING_NAME}/${BUILDTOOL}/${COMPILER}/${MESSAGING_NAME}
-									--prefix=${INSTALL_DIR}/${OS}/${APPLICATION_NAME}/${BUILDTOOL}/${COMPILER}
-									--with-cxx=17
+									--with-messaging=${INSTALL_DIR}/${OS}/${MESSAGING_NAME}/${BUILDTOOL}/${COMPILER}/${MESSAGING_NAME} 
+									--prefix=${INSTALL_DIR}/${OS}/${APPLICATION_NAME}/${BUILDTOOL}/${COMPILER} 
+									--with-cxx=17 
 									${DEBUG_ARGS} 
 									2>&1 
 									| tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
@@ -70,13 +71,13 @@ function configure_application
 	then
 		APPLICATION_CONFIGURE=$(cat <<-EOF
 									CMAKE_PREFIX_PATH=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged/lib/cmake:${INSTALL_DIR}/${OS}/wxwidgets/cmake/${COMPILER}/${WXWIDGETS_DIR}/lib/cmake 
-									CXX=${CXX} 
+									CXX=${COMPILATION_CXX} 
 									cmake 
 									../../.. 
-									-G "Unix Makefiles"									
+									-G "Unix Makefiles" 
 									-DMESSAGEROOT=${INSTALL_DIR}/${OS}/${MESSAGING_NAME}/${BUILDTOOL}/${COMPILER}/${MESSAGING_NAME} 
 									-DCMAKE_CXX_STANDARD=17 
-									${DEBUG_ARGS}									
+									${DEBUG_ARGS} 
 									-DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/${OS}/${APPLICATION_NAME}/${BUILDTOOL}/${COMPILER} 
 									2>&1 
 									| tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log 

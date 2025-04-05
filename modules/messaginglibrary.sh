@@ -43,17 +43,18 @@ function configure_messaging
 	
 	if [ "${COMPILER}" = "gcc" ]
 	then
-		CXX="/usr/bin/g++"
+		COMPILATION_CXX="/usr/bin/g++"
 	fi 
 	if [ "${COMPILER}" = "clang" ]
 	then
-		CXX="/usr/bin/clang++"
+		COMPILATION_CXX="/usr/bin/clang++"
 	fi
 
 	if [ ${BUILDTOOL} = "configure" ]
 	then
 #	CXX=${CXX} seems to mess up the compilation?
 		MESSAGING_CONFIGURE=$(cat <<-EOF
+									CXX=${COMPILATION_CXX} 
 									../../../configure  
 									--with-boost=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged 
 									--prefix=${INSTALL_DIR}/${OS}/${MESSAGING_NAME}/${BUILDTOOL}/${COMPILER}/${MESSAGING_NAME} 
@@ -69,7 +70,7 @@ function configure_messaging
 	then
 		MESSAGING_CONFIGURE=$(cat <<-EOF
 									CMAKE_PREFIX_PATH=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged/lib/cmake 
-									CXX=${CXX} 
+									CXX=${COMPILATION_CXX} 
 									cmake 
 									../../.. 
 									-G "Unix Makefiles" 

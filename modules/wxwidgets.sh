@@ -49,11 +49,11 @@ function configure_wxwidgets
 	
 	if [ "${COMPILER}" = "gcc" ]
 	then
-		CXX="/usr/bin/g++"
+		COMPILATION_CXX="/usr/bin/g++"
 	fi 
 	if [ "${COMPILER}" = "clang" ]
 	then
-		CXX="/usr/bin/clang++"
+		COMPILATION_CXX="/usr/bin/clang++"
 	fi
 
 	if [ ${BUILDTOOL} = "configure" ]
@@ -73,7 +73,7 @@ function configure_wxwidgets
 	if [ ${BUILDTOOL} = "cmake" ]
 	then
 		WXWIDGETS_CONFIGURE=$(cat <<-EOF
-									CXX=${CXX} 
+									CXX=${COMPILATION_CXX} 
 									cmake 
 									../../.. 
 									-G "Unix Makefiles" 
