@@ -8,7 +8,11 @@ vars=$(getopt -o ":o:b:c:d:h" --long "os:,buildtool:,compiler:,debug:,help": -- 
 eval set -- "$vars"
 
 OS=$(uname -s | awk '{ print tolower($0) }')
+if [[ ${OS} =~ ^[Mm][Ii][Nn][Gg][Ww] ]]; then
+  OS=mingw
+fi
 echo "Auto detected ${OS} as operating system"
+
 BUILDTOOL="configure"
 echo "Auto determined ${BUILDTOOL} as buildtool"
 COMPILER=$(readlink -f "$(which cc)")
@@ -156,7 +160,7 @@ case ${OS} in
 		
 		########################################## Linux ##########################################
 		;;
-	mingw64*)
+	mingw*)
 		########################################### W64 ###########################################
 		set_ccache /usr/lib/ccache/bin
 		
@@ -244,7 +248,8 @@ if [ "$do_boost" = "true" ]
 	download_and_extract_boost
 
 	# we us a gcc compiled version of b2 for all compilations
-	configure_boost "gcc"
+	#configure_boost "gcc"
+	configure_boost "clang"	
 
 	if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
 	then
@@ -266,6 +271,12 @@ then
 
 	if [ "${BUILDTOOL}" = "configure" ] || [ "${BUILDTOOL}" = "both" ]
 	then
+		if [ "${DEBUG}" = "true" ]
+		then
+			DEBUG_ARGS="--enable-debug"
+		else
+			DEBUG_ARGS="---disable-debug"
+		fi
 		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
 		then
 			configure_wxwidgets configure gcc ${OS}
@@ -280,6 +291,12 @@ then
 
 	if [ "${BUILDTOOL}" = "cmake" ] || [ "${BUILDTOOL}" = "both" ]
 	then
+		if [ "${DEBUG}" = "true" ]
+		then
+			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=DEBUG"
+		else
+			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=RELEASE"
+		fi
 		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
 		then
 			configure_wxwidgets cmake gcc ${OS}
@@ -390,3 +407,4 @@ then
 		fi 	
 	fi 	
 fi 
+

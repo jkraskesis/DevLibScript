@@ -47,22 +47,38 @@ function configure_wxwidgets
 	local COMPILER=$2
 	local OS=${OS}
 	
+	case ${OS} in
+	linux*)
+		########################################## Linux ##########################################
+		########################################## Linux ##########################################
+		;;
+	mingw*)
+		########################################## W64 ##########################################
+		 export CMAKE_POLICY_VERSION_MINIMUM=3.5
+		########################################## W64 ##########################################
+		;;
+	darwin*)
+		########################################## Darwin ##########################################
+		########################################## Darwin ##########################################
+		;;
+	esac	
+	
 	if [ "${COMPILER}" = "gcc" ]
 	then
-		COMPILATION_CXX="/usr/bin/g++"
+		COMPILATION_CXX="g++"
 	fi 
 	if [ "${COMPILER}" = "clang" ]
 	then
-		COMPILATION_CXX="/usr/bin/clang++"
+		COMPILATION_CXX="clang++"
 	fi
 
 	if [ ${BUILDTOOL} = "configure" ]
 	then
-#	CXX=${CXX} seems to mess up the compilation?
 		WXWIDGETS_CONFIGURE=$(cat <<-EOF
+									CXX=${COMPILATION_CXX}
 									../../../configure 
-									--enable-debug 
-									--with-cxx=17 
+									--with-cxx=17
+									${DEBUG_ARGS} 
 									--prefix=${INSTALL_DIR}/${OS}/wxwidgets/${BUILDTOOL}/${COMPILER}/${WXWIDGETS_DIR} 
 									2>&1 
 									| tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
@@ -73,11 +89,12 @@ function configure_wxwidgets
 	if [ ${BUILDTOOL} = "cmake" ]
 	then
 		WXWIDGETS_CONFIGURE=$(cat <<-EOF
-									CXX=${COMPILATION_CXX} 
 									cmake 
 									../../.. 
-									-G "Unix Makefiles" 
-									-DCMAKE_CXX_STANDARD=17 
+									-G Ninja 
+									-DCMAKE_CXX_COMPILER=${COMPILATION_CXX}
+									-DCMAKE_CXX_STANDARD=17
+									${DEBUG_ARGS} 
 									-DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/${OS}/wxwidgets/${BUILDTOOL}/${COMPILER}/${WXWIDGETS_DIR} 
 									2>&1 
 									| tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
@@ -110,11 +127,21 @@ function compile_wxwidgets
 	cd "${SRC_DIR}/${WXWIDGETS_DIR}/${OS}/${BUILDTOOL}/${COMPILER}" || exit
 	echo "Current directory: " $(pwd) | tee ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_build.log
 	
-	WXWIDGETS_MAKE="make -j${NUMBER_OF_COMPILATIONS} 2>&1 | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_build.log"
+	if [ ${BUILDTOOL} = "configure" ]
+	then
+		MAKE_COMMAND="make"
+	fi 
+	
+	if [ ${BUILDTOOL} = "cmake" ]
+	then
+		MAKE_COMMAND="ninja -v"
+	fi
+
+	WXWIDGETS_MAKE="${MAKE_COMMAND} -j${NUMBER_OF_COMPILATIONS} 2>&1 | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_build.log"
 	echo "${WXWIDGETS_MAKE}" | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_build.log
 	eval ${WXWIDGETS_MAKE}
 	
-	WXWIDGETS_MAKE_INSTALL="make install 2>&1 | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_install.log"
+	WXWIDGETS_MAKE_INSTALL="${MAKE_COMMAND} install 2>&1 | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_install.log"
 	echo "${WXWIDGETS_MAKE_INSTALL}" | tee -a ${LOG_DIR}/wxwidgets_${OS}_${BUILDTOOL}_${COMPILER}_install.log
 	eval ${WXWIDGETS_MAKE_INSTALL}
 }

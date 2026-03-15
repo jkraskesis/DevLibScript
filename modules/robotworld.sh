@@ -29,7 +29,7 @@ function remove_messaging_installations
 function clone_application
 {
 	cd ${SRC_DIR} || exit
-	git clone $APPLICATION_URL
+	git clone --branch $APPLICATION_BRANCH $APPLICATION_URL
 }
 
 ###########################
@@ -43,16 +43,15 @@ function configure_application
 	
 	if [ "${COMPILER}" = "gcc" ]
 	then
-		COMPILATION_CXX="/usr/bin/g++"
+		COMPILATION_CXX="g++"
 	fi 
 	if [ "${COMPILER}" = "clang" ]
 	then
-		COMPILATION_CXX="/usr/bin/clang++"
+		COMPILATION_CXX="clang++"
 	fi 
 
 	if [ ${BUILDTOOL} = "configure" ]
 	then
-#	CXX=${CXX} seems to mess up the compilation?
 		APPLICATION_CONFIGURE=$(cat <<-EOF
 									CXX=${COMPILATION_CXX} 
 									../../../configure 
@@ -66,23 +65,27 @@ function configure_application
 									| tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
 									EOF
 									)
+		echo ${APPLICATION_CONFIGURE}
 	fi
 	if [ ${BUILDTOOL} = "cmake" ]
 	then
 		APPLICATION_CONFIGURE=$(cat <<-EOF
 									CMAKE_PREFIX_PATH=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged/lib/cmake:${INSTALL_DIR}/${OS}/wxwidgets/cmake/${COMPILER}/${WXWIDGETS_DIR}/lib/cmake 
-									CXX=${COMPILATION_CXX} 
 									cmake 
 									../../.. 
-									-G "Unix Makefiles" 
+									-G Ninja 
+									-DCMAKE_CXX_COMPILER=${COMPILATION_CXX}
 									-DMESSAGEROOT=${INSTALL_DIR}/${OS}/${MESSAGING_NAME}/${BUILDTOOL}/${COMPILER}/${MESSAGING_NAME} 
 									-DCMAKE_CXX_STANDARD=17 
 									${DEBUG_ARGS} 
 									-DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}/${OS}/${APPLICATION_NAME}/${BUILDTOOL}/${COMPILER} 
+									-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON 
+									-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON 
 									2>&1 
 									| tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_config.log 
 									EOF
 									)
+		echo ${APPLICATION_CONFIGURE}
 	fi
 
 	# update the Autotools files for local things
@@ -111,17 +114,27 @@ function compile_application
 	local COMPILER=$2
 	local OS=${OS}
 	
-	rm -f ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILD_TOOL_DIR}_${COMPILER}_build.log
-	rm -f ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILD_TOOL_DIR}_${COMPILER}_install.log
+	rm -f ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILD_TOOL}_${COMPILER}_build.log
+	rm -f ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILD_TOOL}_${COMPILER}_install.log
 
 	cd "${SRC_DIR}/${APPLICATION_DIR}/${OS}/${BUILDTOOL}/${COMPILER}" || exit	
 	echo "Current directory: " $(pwd) | tee ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log
 
-	APPLICATION_MAKE="make -j${NUMBER_OF_COMPILATIONS} 2>&1 | tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log"
+	if [ ${BUILDTOOL} = "configure" ]
+	then
+		MAKE_COMMAND="make"
+	fi 
+	
+	if [ ${BUILDTOOL} = "cmake" ]
+	then
+		MAKE_COMMAND="ninja -v"
+	fi
+
+	APPLICATION_MAKE="${MAKE_COMMAND} -j${NUMBER_OF_COMPILATIONS} 2>&1 | tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log"
 	echo "${APPLICATION_MAKE}" | tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log
 	eval ${APPLICATION_MAKE}
 	
-	APPLICATION_MAKE_INSTALL="make install 2>&1 | tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_install.log"
+	APPLICATION_MAKE_INSTALL="${MAKE_COMMAND} install 2>&1 | tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_install.log"
 	echo "${APPLICATION_MAKE_INSTALL}" | tee -a ${LOG_DIR}/${APPLICATION_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_install.log
 	eval ${APPLICATION_MAKE_INSTALL}	
 }

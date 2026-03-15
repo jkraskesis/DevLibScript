@@ -5,24 +5,25 @@
 # shellcheck command line : "shellcheck -x build_robotworld.sh"
 # -x follows sourced files
 
-########################################################
-# The application that should be compiled by this script
-########################################################
+###################################################################
+# The application and branch that should be compiled by this script
+###################################################################
 
 APPLICATION_NAME=robotworld
+APPLICATION_BRANCH=OSM-2
 
-####################################################
-# The library that should be compiled by this script
-####################################################
+###############################################################
+# The library and branch that should be compiled by this script
+###############################################################
 
 MESSAGING_NAME=messaginglibrary
+MESSAGING_BRANCH=main
 
 ###############################################################
 # Configure this depending on the versions/URLs of the packages
 ###############################################################
-
-BOOST_URL=https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2
-WXWIDGETS_URL=https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.6/wxWidgets-3.2.6.tar.bz2
+BOOST_URL=https://archives.boost.io/release/1.90.0/source/boost_1_90_0.tar.bz2
+WXWIDGETS_URL=https://github.com/wxWidgets/wxWidgets/releases/download/v3.3.2/wxWidgets-3.3.2.tar.bz2
 MESSAGING_URL=ssh://git@bitbucket.aimsites.nl:7999/esdd/${MESSAGING_NAME}.git
 APPLICATION_URL=ssh://git@bitbucket.aimsites.nl:7999/esdd/${APPLICATION_NAME}.git
 
@@ -40,9 +41,9 @@ SRC_DIR=${HOME}/devlib/src
 INSTALL_DIR=${HOME}/devlib/
 LOG_DIR=${HOME}/devlib/logs
 
-########################################################
+###########################
 # Source the helper scripts
-########################################################
+###########################
 
 source modules/boost.sh
 source modules/wxwidgets.sh
