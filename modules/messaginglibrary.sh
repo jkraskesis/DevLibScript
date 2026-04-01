@@ -109,8 +109,8 @@ function compile_messaging
 	local COMPILER=$2
 	local OS=${OS}
 
-	rm -f ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILD_TOOL}_${COMPILER}_build.log
-	rm -f ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILD_TOOL}_${COMPILER}_install.log
+	rm -f ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log
+	rm -f ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_install.log
 
 	cd "${SRC_DIR}/${MESSAGING_DIR}/${OS}/${BUILDTOOL}/${COMPILER}" || exit
 	echo "Current directory: " $(pwd) | tee ${LOG_DIR}/${MESSAGING_NAME}_${OS}_${BUILDTOOL}_${COMPILER}_build.log
