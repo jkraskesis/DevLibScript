@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ########################################################
 # Handle the arguments
@@ -7,10 +7,16 @@
 vars=$(getopt -o ":o:b:c:d:h" --long "os:,buildtool:,compiler:,debug:,help": -- "$@")
 eval set -- "$vars"
 
-OS=$(uname -s | awk '{ print tolower($0) }')
-if [[ ${OS} =~ ^[Mm][Ii][Nn][Gg][Ww] ]]; then
-  OS=mingw
-fi
+# Robust OS detection: normalize common uname -s values to one of
+# linux | mingw | macos (maps Darwin -> macos). Fall back to lowercase
+# uname value for unknown platforms.
+UNAME_S=$(uname -s)
+case "${UNAME_S}" in
+  Linux*) OS=linux ;;
+  Darwin*) OS=macos ;;
+  MINGW*|MSYS*|CYGWIN*) OS=mingw ;;
+  *) OS=$(echo "${UNAME_S}" | tr '[:upper:]' '[:lower:]') ;;
+esac
 echo "Auto detected ${OS} as operating system"
 
 BUILDTOOL="configure"
@@ -84,7 +90,7 @@ while true; do
 			;;
 		-h|--help)
 			echo "The arguments to use are: "
-			echo "	-o | --os darwin|linux|mingw"
+ 			echo "	-o | --os macos|linux|mingw"
 			echo "	-b | --buildtool configure|cmake|both"
 			echo "	-c | --compiler gcc|clang|both"
 			echo "	-d | --debug true|false"
@@ -150,7 +156,7 @@ function set_ccache
 #######################################################################################  
 
 case ${OS} in
-	darwin*)
+	macos*)
 		########################################## Darwin ##########################################
 		########################################## Darwin ##########################################
 		;;
@@ -293,9 +299,9 @@ then
 	then
 		if [ "${DEBUG}" = "true" ]
 		then
-			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=DEBUG"
+			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo"
 		else
-			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=RELEASE"
+			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=Release"
 		fi
 		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
 		then
@@ -342,9 +348,9 @@ then
 	then
 		if [ "${DEBUG}" = "true" ]
 		then
-			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=DEBUG"
+			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo"
 		else
-			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=RELEASE"
+			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=Release"
 		fi	
 		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
 		then
@@ -391,9 +397,9 @@ then
 	then
 		if [ "${DEBUG}" = "true" ]
 		then
-			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=DEBUG"
+			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo"
 		else
-			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=RELEASE"
+			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=Release"
 		fi	
 		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
 		then
