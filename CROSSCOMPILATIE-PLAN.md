@@ -62,7 +62,8 @@ Geimplementeerd in de bestaande `modules/build.sh`:
 
 - Opties `--target` en `--dry-run`, met argumentcontrole.
 - Native hostinstellingen gekozen op `BUILD_OS`, niet op het doelplatform.
-- Crossbronnen onder `<SRC_DIR>/cross/<triplet>`, logs onder
+- Native en cross gebruiken dezelfde canonieke bronbomen onder `<SRC_DIR>`.
+  Cross-builds staan onder `<SRC_DIR>/<library>/build/<triplet>` en logs onder
   `<LOG_DIR>/cross/<triplet>`.
 - Instelbare `SRC_DIR`, `INSTALL_DIR`, `LOG_DIR` en optioneel
   `NUMBER_OF_COMPILATIONS`; bestaande standaardpaden behouden.
@@ -104,8 +105,8 @@ De opdracht bouwt shared MSW-libraries, C++17, zonder samples/tests.
 compilerpadnaam `mingw`. Een bestaande geselecteerde wxWidgets-prefix wordt
 voor enige bouwactie geweigerd, ook bij `all`.
 
-De bronnen worden uitsluitend in de crossbronboom hergebruikt, nooit
-opgeruimd. Configuratie, bouw en installatie gebruiken dezelfde opdrachten
+De bronnen worden gedeeld met de native route en nooit automatisch verwijderd.
+Configuratie, bouw en installatie gebruiken dezelfde opdrachten
 voor echte uitvoering en dry-run. Fouten stoppen de flow, ook achter tee.
 `tests/wxwidgets_smoke` is een klein GUI-linkvoorbeeld via de CMake-exports.
 
@@ -135,7 +136,7 @@ en de GCC/C++-runtime. Uitvoering op Windows is nog niet gecontroleerd.
 De configure-crossroute is aangesloten in dezelfde bestaande functies.
 Ze bepaalt het GNU-buildtriplet met de config.guess uit de bron en geeft
 `--build`, `--host`, de MinGW-tools, MSW, shared en C++17 expliciet mee.
-De eigen bouwdirectory is `wxwidgets-configure` onder de crossbronroot.
+De eigen bouwdirectory is `<SRC_DIR>/wxWidgets-3.3.2/build/mingw-cross/configure`.
 `--debug true` geeft `--enable-debug`, false geeft `--disable-debug`;
 de bestaande native configure-argumenten blijven ongewijzigd.
 

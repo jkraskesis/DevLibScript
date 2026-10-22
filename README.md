@@ -21,9 +21,9 @@ Gebruik voor CMake-consumers de exports met
 `find_package(wxWidgets CONFIG REQUIRED)`. De Autotools-installatie heeft
 wel een wx-config; kopieer die niet naar de CMake-installatie.
 
-**Native builds verwijderen vooraf de geselecteerde librarybronnen en alle
-installaties van die library voor het gekozen platform.** Dit bestaande
-gedrag is behouden. Bekijk de acties eerst met `--dry-run`.
+Native builds verwijderen vooraf de installaties van de geselecteerde library
+voor het gekozen platform. De canonieke bronboom blijft behouden en wordt door
+native en cross builds gedeeld. Bekijk de acties eerst met `--dry-run`.
 
 ## Linux naar Windows x86-64
 
@@ -47,13 +47,15 @@ Crosspaden onder de gekozen roots:
 
 | Onderdeel | Pad |
 |---|---|
-| Bronnen en builds | `<SRC_DIR>/cross/x86_64-w64-mingw32/` |
+| Gedeelde bronnen | `<SRC_DIR>/boost_1_90_0/` en `<SRC_DIR>/wxWidgets-3.3.2/` |
+| Cross-builds | `<SRC_DIR>/<library>/build/mingw-cross/` |
 | Logs | `<LOG_DIR>/cross/x86_64-w64-mingw32/` |
 | Boost | `<INSTALL_DIR>/windows/boost/mingw/boost.tagged/` |
 | wxWidgets | `<INSTALL_DIR>/windows/wxwidgets/<cmake-of-configure>/mingw/wxWidgets-3.3.2/` |
 
 Gebruik absolute roots. Zonder overrides blijven de roots `~/devlib/src`,
-`~/devlib` en `~/devlib/logs`. Crossbinaries gebruiken Windows-DLL's, geen
+`~/devlib` en `~/devlib/logs`. Native en cross gebruiken exact dezelfde
+uitgepakte bronboom; alleen de builddirectories verschillen. Crossbinaries gebruiken Windows-DLL's, geen
 Linux-libraries. Kopieer voor uitvoering de bijpassende library- en
 compiler-runtime-DLL's mee; vermeng geen verschillende builds van wxWidgets.
 

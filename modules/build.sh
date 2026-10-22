@@ -181,7 +181,6 @@ if [ -n "${TARGET_TRIPLET}" ]; then
 		echo "Crosscompiler does not target ${TARGET_TRIPLET}." >&2
 		exit 1
 	fi
-	SRC_DIR=${SRC_DIR}/cross/${TARGET_TRIPLET}
 	LOG_DIR=${LOG_DIR}/cross/${TARGET_TRIPLET}
 	BOOST_PREFIX=${INSTALL_DIR}/windows/boost/mingw/boost.tagged
 	WXWIDGETS_PREFIX=${INSTALL_DIR}/windows/wxwidgets/cmake/mingw/${WXWIDGETS_URL##*/}

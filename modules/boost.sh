@@ -6,23 +6,7 @@
 ################################################################### 
 function remove_boost_source
 {
-	if [ "${CROSS_COMPILING}" = true ]; then
-		echo "Reusing isolated Boost sources: ${SRC_DIR}/${BOOST_DIR}"
-		return
-	fi
-	if [ "${DRY_RUN}" = true ]; then
-		preview_command rm -f "${SRC_DIR}/${BOOST_SRC_FILE}"
-		preview_command rm -rf "${SRC_DIR}/${BOOST_DIR}"
-		return
-	fi
-	# source file
-	if [ -f "${SRC_DIR}/${BOOST_SRC_FILE}" ]; then
-  		rm ${SRC_DIR}/${BOOST_SRC_FILE:?}
-	fi
-	# source and build directory
-	if [ -d "${SRC_DIR}/${BOOST_DIR}" ]; then
-  		rm -rf ${SRC_DIR}/${BOOST_DIR:?}
-	fi
+	echo "Keeping canonical Boost sources: ${SRC_DIR}/${BOOST_DIR}"
 }
 
 ###################################################################
@@ -48,11 +32,11 @@ function remove_boost_installations
 ############################
 function download_and_extract_boost
 {
+	if [ -f "${SRC_DIR}/${BOOST_DIR}/bootstrap.sh" ]; then
+		echo "Using canonical Boost source: ${SRC_DIR}/${BOOST_DIR}"
+		return
+	fi
 	if [ "${CROSS_COMPILING}" = true ]; then
-		if [ -f "${SRC_DIR}/${BOOST_DIR}/bootstrap.sh" ]; then
-			echo "Using existing isolated Boost source: ${SRC_DIR}/${BOOST_DIR}"
-			return
-		fi
 		run_cross_logged "${SRC_DIR}" "${LOG_DIR}/boost_download.log" \
 			wget -N "${BOOST_URL}" || return 1
 		run_cross_logged "${SRC_DIR}" "${LOG_DIR}/boost_extract.log" \
@@ -78,10 +62,13 @@ function download_and_extract_boost
 function configure_boost
 {
 	if [ "${CROSS_COMPILING}" = true ]; then
-		local config="${SRC_DIR}/boost-cross.jam"
+		local build_root="${SRC_DIR}/${BOOST_DIR}/build/mingw-cross"
+		local config="${build_root}/boost-cross.jam"
 		if [ "${DRY_RUN}" = true ]; then
+			preview_command mkdir -p "${build_root}"
 			echo "DRY-RUN: write ${config}: using gcc : mingw : ${CXX} ;"
 		else
+			mkdir -p "${build_root}" || return 1
 			printf 'using gcc : mingw : %s ;\n' "${CXX}" > "${config}" || return 1
 		fi
 		run_cross_logged "${SRC_DIR}/${BOOST_DIR}" "${LOG_DIR}/boost_b2_build.log" \
@@ -161,12 +148,12 @@ function compile_boost
 	if [ "${CROSS_COMPILING}" = true ]; then
 		# Match the existing Windows release/shared installation, not its misleading directory name.
 		run_cross_logged "${SRC_DIR}/${BOOST_DIR}" "${LOG_DIR}/boost_b2_mingw_build.log" \
-			./b2 "-j${NUMBER_OF_COMPILATIONS}" --ignore-site-config "--user-config=${SRC_DIR}/boost-cross.jam" \
+			./b2 "-j${NUMBER_OF_COMPILATIONS}" --ignore-site-config "--user-config=${SRC_DIR}/${BOOST_DIR}/build/mingw-cross/boost-cross.jam" \
 			toolset=gcc-mingw target-os=windows architecture=x86 address-model=64 \
 			variant=release threading=multi link=shared runtime-link=shared --layout=system cxxstd=17 \
 			--with-atomic --with-chrono --with-container --with-date_time --with-exception \
 			--with-filesystem --with-json --with-program_options --with-regex --with-thread \
-			"--build-dir=${SRC_DIR}/boost-build" "--prefix=${BOOST_PREFIX}" install
+			"--build-dir=${SRC_DIR}/${BOOST_DIR}/build/mingw-cross" "--prefix=${BOOST_PREFIX}" install
 		return $?
 	fi
 	local COMPILER=${1}	

@@ -6,23 +6,7 @@
 ###################################################################
 function remove_wxwidgets_source
 {
-	if [ "${CROSS_COMPILING}" = true ]; then
-		echo "Reusing isolated wxWidgets sources: ${SRC_DIR}/${WXWIDGETS_DIR}"
-		return
-	fi
-	if [ "${DRY_RUN}" = true ]; then
-		preview_command rm -f "${SRC_DIR}/${WXWIDGETS_SRC_FILE}"
-		preview_command rm -rf "${SRC_DIR}/${WXWIDGETS_DIR}"
-		return
-	fi
-	# source file
-	if [ -f "${SRC_DIR}/${WXWIDGETS_SRC_FILE}" ]; then
-  		rm "${SRC_DIR}/${WXWIDGETS_SRC_FILE:?}"
-	fi
-	# source and build directory
-	if [ -d "${SRC_DIR}/${WXWIDGETS_DIR}" ]; then
-  		rm -rf ${SRC_DIR}/${WXWIDGETS_DIR:?}
-	fi
+	echo "Keeping canonical wxWidgets sources: ${SRC_DIR}/${WXWIDGETS_DIR}"
 }
 
 #######################################
@@ -47,11 +31,11 @@ function remove_wxwidgets_installations
 ################################
 function download_and_extract_wxwidgets
 {
+	if [ -f "${SRC_DIR}/${WXWIDGETS_DIR}/CMakeLists.txt" ]; then
+		echo "Using canonical wxWidgets source: ${SRC_DIR}/${WXWIDGETS_DIR}"
+		return
+	fi
 	if [ "${CROSS_COMPILING}" = true ]; then
-		if [ -f "${SRC_DIR}/${WXWIDGETS_DIR}/CMakeLists.txt" ]; then
-			echo "Using existing isolated wxWidgets source: ${SRC_DIR}/${WXWIDGETS_DIR}"
-			return
-		fi
 		run_cross_logged "${SRC_DIR}" "${LOG_DIR}/wxwidgets_download.log" \
 			wget -N "${WXWIDGETS_URL}" || return 1
 		run_cross_logged "${SRC_DIR}" "${LOG_DIR}/wxwidgets_extract.log" \
@@ -80,20 +64,21 @@ function configure_wxwidgets
 	local COMPILER=$2
 	local OS=${OS}
 	if [ "${CROSS_COMPILING}" = true ]; then
+		local cross_build_root="${SRC_DIR}/${WXWIDGETS_DIR}/build/mingw-cross"
 		local prefix=${INSTALL_DIR}/windows/wxwidgets/${BUILDTOOL}/mingw/${WXWIDGETS_DIR}
 		if [ "${BUILDTOOL}" = configure ]; then
 			local build_triplet
 			if [ "${DRY_RUN}" = true ]; then
 				preview_command sh "${SRC_DIR}/${WXWIDGETS_DIR}/config.guess"
 				build_triplet='<output-of-config.guess>'
-				preview_command mkdir -p "${SRC_DIR}/wxwidgets-configure"
+				preview_command mkdir -p "${cross_build_root}/configure"
 			else
 				build_triplet=$(sh "${SRC_DIR}/${WXWIDGETS_DIR}/config.guess") || return 1
-				mkdir -p "${SRC_DIR}/wxwidgets-configure" || return 1
+				mkdir -p "${cross_build_root}/configure" || return 1
 			fi
 			local debug_option=--disable-debug
 			[ "${DEBUG}" != true ] || debug_option=--enable-debug
-			run_cross_logged "${SRC_DIR}/wxwidgets-configure" "${LOG_DIR}/wxwidgets_configure_config.log" \
+			run_cross_logged "${cross_build_root}/configure" "${LOG_DIR}/wxwidgets_configure_config.log" \
 				env PKG_CONFIG_LIBDIR= PKG_CONFIG_PATH= CC="${TARGET_TRIPLET}-gcc" CXX="${CXX}" \
 				AR="${TARGET_TRIPLET}-ar" RANLIB="${TARGET_TRIPLET}-ranlib" WINDRES="${TARGET_TRIPLET}-windres" \
 				"${SRC_DIR}/${WXWIDGETS_DIR}/configure" "--build=${build_triplet}" "--host=${TARGET_TRIPLET}" \
@@ -104,7 +89,7 @@ function configure_wxwidgets
 		[ "${DEBUG}" != true ] || build_type=RelWithDebInfo
 		run_cross_logged "${SRC_DIR}" "${LOG_DIR}/wxwidgets_cmake_config.log" \
 			env PKG_CONFIG_LIBDIR= PKG_CONFIG_PATH= cmake \
-			-S "${SRC_DIR}/${WXWIDGETS_DIR}" -B "${SRC_DIR}/wxwidgets-cmake" -G Ninja \
+			-S "${SRC_DIR}/${WXWIDGETS_DIR}" -B "${cross_build_root}/cmake" -G Ninja \
 			"-DCMAKE_TOOLCHAIN_FILE=${CROSS_TOOLCHAIN}" \
 			"-DCMAKE_BUILD_TYPE=${build_type}" "-DCMAKE_INSTALL_PREFIX=${WXWIDGETS_PREFIX}" \
 			-DCMAKE_CXX_STANDARD=17 -DwxBUILD_TOOLKIT=msw -DwxBUILD_SHARED=ON \
@@ -192,17 +177,18 @@ function compile_wxwidgets
 	local COMPILER=$2
 	local OS=${OS}
 	if [ "${CROSS_COMPILING}" = true ]; then
+		local cross_build_root="${SRC_DIR}/${WXWIDGETS_DIR}/build/mingw-cross"
 		if [ "${BUILDTOOL}" = configure ]; then
-			run_cross_logged "${SRC_DIR}/wxwidgets-configure" "${LOG_DIR}/wxwidgets_configure_build.log" \
+			run_cross_logged "${cross_build_root}/configure" "${LOG_DIR}/wxwidgets_configure_build.log" \
 				make "-j${NUMBER_OF_COMPILATIONS}" || return 1
-			run_cross_logged "${SRC_DIR}/wxwidgets-configure" "${LOG_DIR}/wxwidgets_configure_install.log" \
+			run_cross_logged "${cross_build_root}/configure" "${LOG_DIR}/wxwidgets_configure_install.log" \
 				make install
 			return $?
 		fi
 		run_cross_logged "${SRC_DIR}" "${LOG_DIR}/wxwidgets_cmake_build.log" \
-			cmake --build "${SRC_DIR}/wxwidgets-cmake" --parallel "${NUMBER_OF_COMPILATIONS}" || return 1
+			cmake --build "${cross_build_root}/cmake" --parallel "${NUMBER_OF_COMPILATIONS}" || return 1
 		run_cross_logged "${SRC_DIR}" "${LOG_DIR}/wxwidgets_cmake_install.log" \
-			cmake --install "${SRC_DIR}/wxwidgets-cmake"
+			cmake --install "${cross_build_root}/cmake"
 		return $?
 	fi
 	if [ "${DRY_RUN}" = true ]; then
