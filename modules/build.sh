@@ -4,7 +4,10 @@
 # Handle the arguments
 ########################################################
 
-vars=$(getopt -o ":o:b:c:d:h" --long "os:,buildtool:,compiler:,debug:,help": -- "$@")
+vars=$(getopt -o ":o:b:c:d:h" --long "os:,buildtool:,compiler:,debug:,help,target:,dry-run" -- "$@") || {
+	echo "Invalid options or missing option value. Use --help for usage." >&2
+	exit 1
+}
 eval set -- "$vars"
 
 # Robust OS detection: normalize common uname -s values to one of
@@ -18,25 +21,29 @@ case "${UNAME_S}" in
   *) OS=$(echo "${UNAME_S}" | tr '[:upper:]' '[:lower:]') ;;
 esac
 echo "Auto detected ${OS} as operating system"
+BUILD_OS=${OS}
+TARGET_TRIPLET=
+DRY_RUN=false
+OS_EXPLICIT=false
 
 BUILDTOOL="configure"
 echo "Auto determined ${BUILDTOOL} as buildtool"
-COMPILER=$(readlink -f "$(which cc)")
-if [[ $COMPILER == *gcc* ]]; then
-	echo "Auto detected gcc as default cc compiler"
-	COMPILER="gcc"
-fi
-if [[ $COMPILER == *clang* ]]; then
-	echo "Auto detected clang as default cc compiler"
-	COMPILER="clang"
+COMPILER=unknown
+if COMPILER_MACROS=$(cc -dM -E -x c /dev/null); then
+	if [[ ${COMPILER_MACROS} == *'define __clang__ '* ]]; then
+		COMPILER=clang
+	elif [[ ${COMPILER_MACROS} == *'define __GNUC__ '* ]]; then
+		COMPILER=gcc
+	fi
+	echo "Auto detected ${COMPILER} as default cc compiler"
+else
+	echo "Cannot detect default cc compiler; specify --compiler gcc or clang." >&2
 fi
 DEBUG="true"
 echo "Auto detected DEBUG as true"
 
 do_boost=false
 do_wxwidgets=false
-do_messaging=false
-do_application=false
 do_all=false
 
 function handle_argument
@@ -50,22 +57,17 @@ function handle_argument
 			do_wxwidgets=true
 		;;
 
-		messaging)
-			do_messaging=true
-		;;
-		
-		application)
-			do_application=true
-		;;
 		all)
 			do_boost=true
 			do_wxwidgets=true
-			do_messaging=true
-			do_application=true
 			do_all=true
 		;;
+		*)
+			echo "Unsupported project: $1. Choose boost, wxwidgets or all." >&2
+			exit 1
+		;;
 	esac
-	if [[ ${do_boost} == "true" && ${do_wxwidgets} == "true" && ${do_messaging} == "true" && ${do_application} == "true" ]]; then
+	if [[ ${do_boost} == "true" && ${do_wxwidgets} == "true" ]]; then
 		do_all=true
 	fi
 }
@@ -74,6 +76,7 @@ while true; do
 	case "$1" in
 		-o|--os)
 			OS=$2
+			OS_EXPLICIT=true
 			shift 2
 			;;
 		-b|--buildtool)
@@ -88,17 +91,25 @@ while true; do
 			DEBUG=$2
 			shift 2
 			;;
+		--target)
+			TARGET_TRIPLET=$2
+			shift 2
+			;;
+		--dry-run)
+			DRY_RUN=true
+			shift
+			;;
 		-h|--help)
 			echo "The arguments to use are: "
  			echo "	-o | --os macos|linux|mingw"
 			echo "	-b | --buildtool configure|cmake|both"
 			echo "	-c | --compiler gcc|clang|both"
 			echo "	-d | --debug true|false"
+			echo "	--target x86_64-w64-mingw32 (GCC crosscompiler)"
+			echo "	--dry-run (show commands without running them)"
 			echo "	boost"
 			echo "	wxwidgets"
-			echo "	messaging"
-			echo "	application"
-			echo "	all (= boost && wxwidgets && messaging && application)"
+			echo "	all (= boost && wxwidgets)"
 			exit 1
 		;;
 		--) 
@@ -115,17 +126,116 @@ for arg in "${@}"; do
 	handle_argument "$arg"
 done
 
+if [ -z "${SRC_DIR}" ] || [ -z "${INSTALL_DIR}" ] || [ -z "${LOG_DIR}" ]; then
+	echo "SRC_DIR, INSTALL_DIR and LOG_DIR must not be empty." >&2
+	exit 1
+fi
+
+case ${OS} in
+	linux|mingw|macos) ;;
+	*) echo "Unsupported OS: ${OS}" >&2; exit 1 ;;
+esac
+case ${BUILDTOOL} in
+	configure|cmake|both) ;;
+	*) echo "Unsupported buildtool: ${BUILDTOOL}" >&2; exit 1 ;;
+esac
+case ${COMPILER} in
+	gcc|clang|both) ;;
+	*) echo "Unsupported compiler: ${COMPILER}" >&2; exit 1 ;;
+esac
+case ${DEBUG} in
+	true|false) ;;
+	*) echo "Unsupported debug value: ${DEBUG}" >&2; exit 1 ;;
+esac
+
+CROSS_COMPILING=false
+TARGET_OS=${OS}
+if [ -n "${TARGET_TRIPLET}" ]; then
+	if [ "${BUILD_OS}" != linux ] || [ "${TARGET_TRIPLET}" != x86_64-w64-mingw32 ] ||
+		[ "${COMPILER}" != gcc ] ||
+		{ [ "${OS_EXPLICIT}" = true ] && [ "${OS}" != mingw ]; }; then
+		echo "Cross builds require Linux, --target x86_64-w64-mingw32 and --compiler gcc (without a conflicting --os)." >&2
+		exit 1
+	fi
+	CROSS_COMPILING=true
+	TARGET_OS=mingw
+	CXX=${TARGET_TRIPLET}-g++
+	for tool in "${CXX}" gcc g++ wget tar bzip2 tee; do
+		command -v "${tool}" >/dev/null || {
+			echo "Missing build tool: ${tool}" >&2
+			exit 1
+		}
+	done
+	if [ "${do_wxwidgets}" = true ]; then
+		wx_tools=("${TARGET_TRIPLET}-gcc" "${TARGET_TRIPLET}-windres")
+		[ "${BUILDTOOL}" = configure ] || wx_tools+=(cmake ninja)
+		[ "${BUILDTOOL}" = cmake ] || wx_tools+=(make "${TARGET_TRIPLET}-ar" "${TARGET_TRIPLET}-ranlib")
+		for tool in "${wx_tools[@]}"; do
+			command -v "${tool}" >/dev/null || {
+				echo "Missing wxWidgets build tool: ${tool}" >&2
+				exit 1
+			}
+		done
+	fi
+	if [ "$("${CXX}" -dumpmachine)" != "${TARGET_TRIPLET}" ]; then
+		echo "Crosscompiler does not target ${TARGET_TRIPLET}." >&2
+		exit 1
+	fi
+	SRC_DIR=${SRC_DIR}/cross/${TARGET_TRIPLET}
+	LOG_DIR=${LOG_DIR}/cross/${TARGET_TRIPLET}
+	BOOST_PREFIX=${INSTALL_DIR}/windows/boost/mingw/boost.tagged
+	WXWIDGETS_PREFIX=${INSTALL_DIR}/windows/wxwidgets/cmake/mingw/${WXWIDGETS_URL##*/}
+	WXWIDGETS_PREFIX=${WXWIDGETS_PREFIX%.tar.bz2}
+	CROSS_TOOLCHAIN=$(pwd)/toolchains/mingw-gcc.cmake
+	if [ "${do_boost}" = true ] && { [ -e "${BOOST_PREFIX}" ] || [ -L "${BOOST_PREFIX}" ]; }; then
+		echo "Refusing to overwrite ${BOOST_PREFIX}. Use a separate INSTALL_DIR." >&2
+		exit 1
+	fi
+	if [ "${do_wxwidgets}" = true ]; then
+		for wx_tool in configure cmake; do
+			[ "${BUILDTOOL}" = "${wx_tool}" ] || [ "${BUILDTOOL}" = both ] || continue
+			prefix=${INSTALL_DIR}/windows/wxwidgets/${wx_tool}/mingw/${WXWIDGETS_URL##*/}
+			prefix=${prefix%.tar.bz2}
+			if [ -e "${prefix}" ] || [ -L "${prefix}" ]; then
+				echo "Refusing to overwrite ${prefix}. Use a separate INSTALL_DIR." >&2
+				exit 1
+			fi
+		done
+	fi
+fi
+
+function preview_command
+{
+	printf 'DRY-RUN:'
+	printf ' %q' "$@"
+	printf '\n'
+}
+
+function run_cross_logged
+{
+	local directory=$1 log=$2
+	shift 2
+	if [ "${DRY_RUN}" = true ]; then
+		preview_command cd "${directory}"
+		preview_command "$@"
+		echo "DRY-RUN: log to ${log}"
+	else
+		(
+			set -o pipefail
+			cd "${directory}" || exit 1
+			"$@" 2>&1 | tee "${log}"
+		) || {
+			echo "Cross build failed; see ${log}." >&2
+			return 1
+		}
+	fi
+}
+
 BOOST_SRC_FILE=${BOOST_URL##*/} # translates the download url to boost_a_b_c_.tar.bz2
 BOOST_DIR=${BOOST_SRC_FILE%.tar.bz2}  # translates the boost_a_b_c_.tar.bz2 to boost_a_b_c
 
 WXWIDGETS_SRC_FILE=${WXWIDGETS_URL##*/} # translates the download url to wxwidgets-a.b.c.tar.bz2
 WXWIDGETS_DIR=${WXWIDGETS_SRC_FILE%.tar.bz2}  # translates the wxwidgets-a.b.c.tar.bz2 to wxwidgets-a.b.c
-
-#MESSAGING_SRC_FILE="Tomptiedom: no source file for Messaging" # application has no source file tar.bz2 
-MESSAGING_DIR=${MESSAGING_NAME}
-
-#APPLICATION_SRC_FILE="Tomptiedom: no source file for ${APPLICATION_NAME}" # application has no source file tar.bz2 
-APPLICATION_DIR=${APPLICATION_NAME}
 
 ##########################################################################
 # Use ccache. This must be done after the autodetection of the compiler
@@ -155,7 +265,7 @@ function set_ccache
 # Set the correct source and installation directories depending on the operating system
 #######################################################################################  
 
-case ${OS} in
+case ${BUILD_OS} in
 	macos*)
 		########################################## Darwin ##########################################
 		########################################## Darwin ##########################################
@@ -189,11 +299,17 @@ esac
 ########################################################
 
 # The number of processors that the compilations can use
-NUMBER_OF_PROCESSORS=$(grep -c ^processor /proc/cpuinfo)
-if echo ${NUMBER_OF_PROCESSORS} | grep -E -q '^[0-9]+$'; then
-    NUMBER_OF_COMPILATIONS=$((NUMBER_OF_PROCESSORS-1))
-else
-    NUMBER_OF_COMPILATIONS=4
+if [ -z "${NUMBER_OF_COMPILATIONS+x}" ]; then
+	NUMBER_OF_PROCESSORS=$(grep -c ^processor /proc/cpuinfo)
+	if echo ${NUMBER_OF_PROCESSORS} | grep -E -q '^[0-9]+$' && [ "${NUMBER_OF_PROCESSORS}" -gt 1 ]; then
+		NUMBER_OF_COMPILATIONS=$((NUMBER_OF_PROCESSORS-1))
+	else
+		NUMBER_OF_COMPILATIONS=4
+	fi
+fi
+if ! [[ "${NUMBER_OF_COMPILATIONS}" =~ ^[1-9][0-9]*$ ]]; then
+	echo "NUMBER_OF_COMPILATIONS must be a positive integer." >&2
+	exit 1
 fi
 
 #######################################################################################################################################
@@ -205,7 +321,6 @@ echo "BUILDTOOL: "${BUILDTOOL}
 echo "COMPILER: "${COMPILER}
 echo "BOOST_URL: "${BOOST_URL}
 echo "WXWIDGETS_URL: "${WXWIDGETS_URL}
-echo "APPLICATION_URL: "${APPLICATION_URL}
 echo "SRC_DIR: "${SRC_DIR}
 echo "INSTALL_DIR: "${INSTALL_DIR}
 echo "LOG_DIR: "${LOG_DIR}
@@ -216,15 +331,18 @@ echo "COMPILER: "${COMPILER}
 echo "DEBUG: "${DEBUG}
 echo "do_boost :"${do_boost}
 echo "do_wxwidgets :"${do_wxwidgets}
-echo "do_messaging :"${do_messaging}
-echo "do_application :"${do_application}
 echo "do_all :"${do_all}
-echo "MESSAGING_NAME :"${MESSAGING_NAME}
-echo "APPLICATION_NAME :"${APPLICATION_NAME}
 echo "BOOST_DIR :"${BOOST_DIR}
 echo "WXWIDGETS_DIR :"${WXWIDGETS_DIR}
-echo "MESSAGING_DIR :"${MESSAGING_DIR}
-echo "APPLICATION_DIR :"${APPLICATION_DIR}
+echo "BUILD_OS: ${BUILD_OS}"
+echo "TARGET_OS: ${TARGET_OS}"
+echo "TARGET_TRIPLET: ${TARGET_TRIPLET}"
+echo "CROSS_COMPILING: ${CROSS_COMPILING}"
+echo "DRY_RUN: ${DRY_RUN}"
+if [ "${CROSS_COMPILING}" = true ]; then
+	echo "BOOST_PREFIX: ${BOOST_PREFIX}"
+	echo "CXX: ${CXX}"
+fi
 
 ##########################################################################
 # Create the root directories: No checking of any kind is done...
@@ -232,6 +350,14 @@ echo "APPLICATION_DIR :"${APPLICATION_DIR}
 ##########################################################################
 function create_directories
 {
+	if [ "${DRY_RUN}" = true ]; then
+		preview_command mkdir -p "${SRC_DIR}" "${INSTALL_DIR}" "${LOG_DIR}"
+		return
+	fi
+	if [ "${CROSS_COMPILING}" = true ]; then
+		mkdir -p "${SRC_DIR}" "${INSTALL_DIR}" "${LOG_DIR}" || exit 1
+		return
+	fi
 	mkdir -p ${SRC_DIR}
 	mkdir -p ${INSTALL_DIR}
 	mkdir -p ${LOG_DIR}
@@ -251,19 +377,19 @@ if [ "$do_boost" = "true" ]
 	
 	remove_boost_installations
 
-	download_and_extract_boost
+	download_and_extract_boost || exit 1
 
 	# we us a gcc compiled version of b2 for all compilations
 	#configure_boost "gcc"
-	configure_boost "clang"	
+	configure_boost "clang" || exit 1
 
 	if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
 	then
-		compile_boost gcc
+		compile_boost gcc || exit 1
 	fi 
 	if [ "${COMPILER}" = "clang" ] || [ "${COMPILER}" = "both" ]
 	then
-		compile_boost clang
+		compile_boost clang || exit 1
 	fi
 fi
 
@@ -273,7 +399,7 @@ then
 	
 	remove_wxwidgets_installations
 	
-	download_and_extract_wxwidgets
+	download_and_extract_wxwidgets || exit 1
 
 	if [ "${BUILDTOOL}" = "configure" ] || [ "${BUILDTOOL}" = "both" ]
 	then
@@ -285,8 +411,8 @@ then
 		fi
 		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
 		then
-			configure_wxwidgets configure gcc ${OS}
-			compile_wxwidgets configure gcc ${OS}
+			configure_wxwidgets configure gcc ${OS} || exit 1
+			compile_wxwidgets configure gcc ${OS} || exit 1
 		fi 
 		if [ "${COMPILER}" = "clang" ] || [ "${COMPILER}" = "both" ]
 		then
@@ -305,8 +431,8 @@ then
 		fi
 		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
 		then
-			configure_wxwidgets cmake gcc ${OS}
-			compile_wxwidgets cmake gcc ${OS}
+			configure_wxwidgets cmake gcc ${OS} || exit 1
+			compile_wxwidgets cmake gcc ${OS} || exit 1
 		fi 
 		if [ "${COMPILER}" = "clang" ] || [ "${COMPILER}" = "both" ]
 		then
@@ -315,102 +441,3 @@ then
 		fi 	
 	fi 
 fi 
-
-if [ "$do_messaging" = "true" ]
-then
-	remove_messaging_source
-
-	remove_messaging_installations
-	
-	clone_messaging 
-
-	if [ "${BUILDTOOL}" = "configure" ] || [ "${BUILDTOOL}" = "both" ]
-	then
-		if [ "${DEBUG}" = "true" ]
-		then
-			DEBUG_ARGS="--enable-development=yes"
-		else
-			DEBUG_ARGS="--enable-development=no"
-		fi	
-		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
-		then
-			configure_messaging configure gcc ${OS}
-			compile_messaging configure gcc ${OS}
-		fi 
-		if [ "${COMPILER}" = "clang" ] || [ "${COMPILER}" = "both" ]
-		then
-			configure_messaging configure clang ${OS}
-			compile_messaging configure clang ${OS}
-		fi 	
-	fi 
-
-	if [ "${BUILDTOOL}" = "cmake" ] || [ "${BUILDTOOL}" = "both" ]
-	then
-		if [ "${DEBUG}" = "true" ]
-		then
-			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo"
-		else
-			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=Release"
-		fi	
-		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
-		then
-			configure_messaging cmake gcc ${OS}
-			compile_messaging cmake gcc ${OS}
-		fi 
-		if [ "${COMPILER}" = "clang" ] || [ "${COMPILER}" = "both" ]
-		then
-			configure_messaging cmake clang ${OS}
-			compile_messaging cmake clang ${OS}
-		fi 	
-	fi 	
-fi 
-
-if [ "$do_application" = "true" ]
-then
-	remove_application_source
-
-	remove_messaging_installations
-	
-	clone_application 
-
-	if [ "${BUILDTOOL}" = "configure" ] || [ "${BUILDTOOL}" = "both" ]
-	then
-		if [ "${DEBUG}" = "true" ]
-		then
-			DEBUG_ARGS="--enable-development=yes"
-		else
-			DEBUG_ARGS="--enable-development=no"
-		fi	
-		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
-		then
-			configure_application configure gcc ${OS}
-			compile_application configure gcc ${OS}
-		fi 
-		if [ "${COMPILER}" = "clang" ] || [ "${COMPILER}" = "both" ]
-		then
-			configure_application configure clang ${OS}
-			compile_application configure clang ${OS}
-		fi 	
-	fi 
-
-	if [ "${BUILDTOOL}" = "cmake" ] || [ "${BUILDTOOL}" = "both" ]
-	then
-		if [ "${DEBUG}" = "true" ]
-		then
-			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo"
-		else
-			DEBUG_ARGS="-DCMAKE_BUILD_TYPE=Release"
-		fi	
-		if [ "${COMPILER}" = "gcc" ] || [ "${COMPILER}" = "both" ]
-		then
-			configure_application cmake gcc ${OS}
-			compile_application cmake gcc ${OS}
-		fi 
-		if [ "${COMPILER}" = "clang" ] || [ "${COMPILER}" = "both" ]
-		then
-			configure_application cmake clang ${OS}
-			compile_application cmake clang ${OS}
-		fi 	
-	fi 	
-fi 
-
