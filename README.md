@@ -15,6 +15,11 @@ Boost gebruikt altijd b2. `--compiler gcc|clang|both` selecteert native
 compilers. Standaard zijn `configure`, de gedetecteerde compiler en
 `--debug true` actief. Windows gebruikt de bestaande 64-bit MSYS2-route.
 
+Boost.Process wordt gebouwd met de B2-feature `boost.process.fs=std`, die
+`BOOST_PROCESS_USE_STD_FS` definieert, zodat de
+geïnstalleerde Boost.Process-library geen Boost.Filesystem-linkdependency
+heeft. De native en cross-routes nemen Boost.Process expliciet mee.
+
 Native Windows-CMake gebruikt standaard de Windows-librarynaamgeving en
 installeert daarbij geen `wx-config`. Dit is normaal wxWidgets-gedrag.
 Gebruik voor CMake-consumers de exports met

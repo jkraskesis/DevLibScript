@@ -152,7 +152,8 @@ function compile_boost
 			toolset=gcc-mingw target-os=windows architecture=x86 address-model=64 \
 			variant=release threading=multi link=shared runtime-link=shared --layout=system cxxstd=17 \
 			--with-atomic --with-chrono --with-container --with-date_time --with-exception \
-			--with-filesystem --with-json --with-program_options --with-regex --with-thread \
+			--with-filesystem --with-json --with-process --with-program_options --with-regex --with-thread \
+			boost.process.fs=std \
 			"--build-dir=${SRC_DIR}/${BOOST_DIR}/build/mingw-cross" "--prefix=${BOOST_PREFIX}" install
 		return $?
 	fi
@@ -174,7 +175,7 @@ function compile_boost
 						--build-dir=${SRC_DIR}/${BOOST_DIR}/build/${OS}/${COMPILER} 
 						--prefix=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged 
 						--build-type=complete link=shared runtime-link=shared threading=multi,single variant=debug,release --layout=tagged --without-python --without-mpi 
-						--cxxflags="-std=c++17" 
+						--cxxflags="-std=c++17" boost.process.fs=std
 						install 
 						2>&1 
 						| tee -a ${LOG_DIR}/boost_${OS}_b2_${COMPILER}_build.log 
@@ -197,7 +198,7 @@ function compile_boost
 						variant=debug,release link=shared runtime-link=shared address-model=64 threading=multi --layout=tagged --without-python --without-mpi
 						--build-dir=${SRC_DIR}/tmp/${COMPILER} 
 						--prefix=${INSTALL_DIR}/${OS}/boost/${COMPILER}/boost.tagged  
-						--build-type=complete link=shared runtime-link=shared threading=multi,single variant=debug,release --layout=tagged --without-python --without-mpi 												
+						--build-type=complete link=shared runtime-link=shared threading=multi,single variant=debug,release --layout=tagged --without-python --without-mpi boost.process.fs=std
 						install  
 						2>&1 
 						| tee -a ${LOG_DIR}/boost_${OS}_b2_${COMPILER}_build.log 
