@@ -149,7 +149,7 @@ function compile_boost
 		# Match the existing Windows release/shared installation, not its misleading directory name.
 		run_cross_logged "${SRC_DIR}/${BOOST_DIR}" "${LOG_DIR}/boost_b2_mingw_build.log" \
 			./b2 "-j${NUMBER_OF_COMPILATIONS}" --ignore-site-config "--user-config=${SRC_DIR}/${BOOST_DIR}/build/mingw-cross/boost-cross.jam" \
-			toolset=gcc-mingw target-os=windows architecture=x86 address-model=64 \
+			toolset=gcc-mingw target-os=windows architecture=x86 address-model=64 abi=ms binary-format=pe \
 			variant=release threading=multi link=shared runtime-link=shared --layout=system cxxstd=17 \
 			--with-atomic --with-chrono --with-container --with-date_time --with-exception \
 			--with-filesystem --with-json --with-process --with-program_options --with-regex --with-thread \
